@@ -1,0 +1,31 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# Env files
+.env
+!*.env.example
+
+# Logs
+*.log
+
+# Raw dataset (large — download via README instructions instead)
+notebooks/data/*.csv
+
+# Trained model artifact (168MB — exceeds the 50MB guideline; regenerate via the notebook)
+backend/app/models/house_price.pkl
+notebooks/house_price.pkl
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
