@@ -4,23 +4,21 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.prediction import router as prediction_router
-from app.core.config import settings
+from app.core.config import get_settings
 from app.services.inference import load_model
+from app.utils.logging_config import configure_logging
+
+settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Load the model once at startup, not on every request.
-    load_model()
+    configure_logging()
+    load_model()  # load once at startup, not on every request
     yield
 
 
-app = FastAPI(
-    title="House Price Prediction API",
-    description="Serves a scikit-learn model trained on the Kaggle House Price dataset.",
-    version="1.0.0",
-    lifespan=lifespan,
-)
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

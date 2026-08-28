@@ -1,32 +1,18 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 class PredictionRequest(BaseModel):
-    location: str = Field(..., description="Location / area name, e.g. 'thane'")
-    carpet_area_sqft: float = Field(..., gt=0, description="Carpet area in square feet")
-    floor_num: int = Field(..., description="Floor number (0 = Ground, -1 = Basement)")
-    bathroom: int = Field(..., ge=0, description="Number of bathrooms")
-    balcony: int = Field(..., ge=0, description="Number of balconies")
-    furnishing: str = Field(..., description="'Furnished' | 'Semi-Furnished' | 'Unfurnished'")
-    transaction: str = Field(..., description="'New Property' | 'Resale' | 'Other' | 'Rent/Lease'")
-    ownership: str = Field(..., description="'Freehold' | 'Co-operative Society' | 'Power Of Attorney' | 'Leasehold'")
-    facing: str = Field(..., description="e.g. 'East', 'North - West', ...")
+    """Matches the features the model pipeline was trained on."""
 
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "location": "thane",
-                "carpet_area_sqft": 900,
-                "floor_num": 3,
-                "bathroom": 2,
-                "balcony": 1,
-                "furnishing": "Semi-Furnished",
-                "transaction": "Resale",
-                "ownership": "Freehold",
-                "facing": "East",
-            }
-        }
-    )
+    location: str = Field(..., examples=["Location_1"])
+    carpet_area_sqft: float = Field(..., gt=0, examples=[1200])
+    floor_num: int = Field(..., examples=[3])
+    bathroom: int = Field(..., ge=0, examples=[2])
+    balcony: int = Field(..., ge=0, examples=[1])
+    furnishing: str = Field(..., examples=["Semi-Furnished"])  # Furnished | Semi-Furnished | Unfurnished
+    transaction: str = Field(..., examples=["Resale"])  # New Property | Resale
+    ownership: str = Field(..., examples=["Freehold"])
+    facing: str = Field(..., examples=["East"])
 
 
 class PredictionResponse(BaseModel):
@@ -34,4 +20,4 @@ class PredictionResponse(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    status: str
+    status: str = "ok"

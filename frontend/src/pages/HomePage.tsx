@@ -1,11 +1,11 @@
-import PredictionForm from "../components/PredictionForm";
+import { PredictionForm } from "../components/PredictionForm";
 
-export default function HomePage() {
+export function HomePage() {
   return (
-    <div className="page">
-      <h1>House Price Predictor</h1>
-      <p className="subtitle">Enter property details to get an estimated price.</p>
+    <main className="page">
+      <h1>House Price Prediction</h1>
+      <p>Enter the property details below to get an estimated price.</p>
       <PredictionForm />
-    </div>
+    </main>
   );
 }

@@ -1,26 +1,41 @@
+import logging
+from pathlib import Path
+from typing import Any
+
 import joblib
+import pandas as pd
 
-from app.core.config import settings
-from app.schemas.prediction import PredictionRequest
-from app.services.preprocessing import request_to_dataframe
+from app.core.config import get_settings
 
-_model = None
+logger = logging.getLogger(__name__)
+
+_model: Any = None
 
 
 def load_model() -> None:
     """Load the trained pipeline from disk. Called once at app startup."""
     global _model
-    _model = joblib.load(settings.model_path)
+    settings = get_settings()
+    model_path = Path(settings.model_path)
+
+    if not model_path.exists():
+        raise FileNotFoundError(
+            f"Model file not found at {model_path}. "
+            "Copy house_price.pkl from the notebook into backend/models/."
+        )
+
+    logger.info("Loading model from %s", model_path)
+    _model = joblib.load(model_path)
+    logger.info("Model loaded successfully")
 
 
-def get_model():
+def get_model() -> Any:
     if _model is None:
         raise RuntimeError("Model has not been loaded yet. Call load_model() at startup.")
     return _model
 
 
-def predict_price(request: PredictionRequest) -> float:
+def predict(features: pd.DataFrame) -> float:
     model = get_model()
-    X = request_to_dataframe(request)
-    prediction = model.predict(X)
+    prediction = model.predict(features)
     return float(prediction[0])

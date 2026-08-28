@@ -1,68 +1,97 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchLocations, predictPrice, ApiError } from "../api/predictionClient";
-import {
-  FACING_OPTIONS,
-  FURNISHING_OPTIONS,
-  OWNERSHIP_OPTIONS,
-  TRANSACTION_OPTIONS,
-  type PredictionRequest,
-} from "../types/prediction";
+import { predictPrice, PredictionApiError } from "../api/predictionClient";
+import type { PredictionRequest } from "../types/prediction";
 
-const initialForm: PredictionRequest = {
+const FURNISHING_OPTIONS = ["Furnished", "Semi-Furnished", "Unfurnished"] as const;
+const TRANSACTION_OPTIONS = ["New Property", "Resale"] as const;
+const OWNERSHIP_OPTIONS = ["Freehold", "Leasehold", "Co-operative Society", "Power Of Attorney"];
+const FACING_OPTIONS = [
+  "East",
+  "West",
+  "North",
+  "South",
+  "North-East",
+  "North-West",
+  "South-East",
+  "South-West",
+];
+
+const initialForm = {
   location: "",
-  carpet_area_sqft: 0,
-  floor_num: 0,
-  bathroom: 1,
-  balcony: 0,
-  furnishing: FURNISHING_OPTIONS[0],
-  transaction: TRANSACTION_OPTIONS[0],
+  carpet_area_sqft: "",
+  floor_num: "",
+  bathroom: "",
+  balcony: "",
+  furnishing: FURNISHING_OPTIONS[1],
+  transaction: TRANSACTION_OPTIONS[1],
   ownership: OWNERSHIP_OPTIONS[0],
   facing: FACING_OPTIONS[0],
 };
 
-export default function PredictionForm() {
+export function PredictionForm() {
   const navigate = useNavigate();
   const [locations, setLocations] = useState<string[]>([]);
-  const [locationsError, setLocationsError] = useState<string | null>(null);
-  const [form, setForm] = useState<PredictionRequest>(initialForm);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [form, setForm] = useState(initialForm);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchLocations()
-      .then((locs) => setLocations(locs))
-      .catch(() => setLocationsError("Could not load locations. You can still type one manually."));
+    fetch("/locations.json")
+      .then((res) => res.json())
+      .then((data: string[]) => setLocations(data))
+      .catch(() => setLocations([]));
   }, []);
 
-  function update<K extends keyof PredictionRequest>(key: K, value: PredictionRequest[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+  function handleChange(field: keyof typeof initialForm, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   function validate(): boolean {
-    const errors: Record<string, string> = {};
-    if (!form.location.trim()) errors.location = "Location is required.";
-    if (!form.carpet_area_sqft || form.carpet_area_sqft <= 0) {
-      errors.carpet_area_sqft = "Carpet area must be greater than 0.";
+    const next: Record<string, string> = {};
+
+    if (!form.location) next.location = "Please choose a location.";
+    if (!form.carpet_area_sqft || Number(form.carpet_area_sqft) <= 0) {
+      next.carpet_area_sqft = "Area must be greater than 0.";
     }
-    if (form.bathroom < 0) errors.bathroom = "Bathrooms cannot be negative.";
-    if (form.balcony < 0) errors.balcony = "Balconies cannot be negative.";
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
+    if (form.floor_num === "") next.floor_num = "Floor is required.";
+    if (form.bathroom === "" || Number(form.bathroom) < 0) {
+      next.bathroom = "Bathrooms must be 0 or more.";
+    }
+    if (form.balcony === "" || Number(form.balcony) < 0) {
+      next.balcony = "Balconies must be 0 or more.";
+    }
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setSubmitError(null);
+
     if (!validate()) return;
+
+    const payload: PredictionRequest = {
+      location: form.location,
+      carpet_area_sqft: Number(form.carpet_area_sqft),
+      floor_num: Number(form.floor_num),
+      bathroom: Number(form.bathroom),
+      balcony: Number(form.balcony),
+      furnishing: form.furnishing as PredictionRequest["furnishing"],
+      transaction: form.transaction as PredictionRequest["transaction"],
+      ownership: form.ownership,
+      facing: form.facing,
+    };
 
     setLoading(true);
     try {
-      const result = await predictPrice(form);
-      navigate("/result", { state: { predictedPrice: result.predicted_price, form } });
+      const result = await predictPrice(payload);
+      navigate("/result", { state: { predictedPrice: result.predicted_price } });
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Something went wrong. Please try again.";
+      const message =
+        err instanceof PredictionApiError ? err.message : "Something went wrong. Please try again.";
       setSubmitError(message);
     } finally {
       setLoading(false);
@@ -70,79 +99,77 @@ export default function PredictionForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="prediction-form">
-      <div className="form-field">
+    <form onSubmit={handleSubmit} className="prediction-form" noValidate>
+      <div className="field">
         <label htmlFor="location">Location</label>
-        <input
+        <select
           id="location"
-          list="location-options"
           value={form.location}
-          onChange={(e) => update("location", e.target.value)}
-          placeholder="e.g. thane"
-        />
-        {locations.length > 0 && (
-          <datalist id="location-options">
-            {locations.map((loc) => (
-              <option key={loc} value={loc} />
-            ))}
-          </datalist>
-        )}
-        {locationsError && <p className="hint">{locationsError}</p>}
-        {fieldErrors.location && <p className="error">{fieldErrors.location}</p>}
+          onChange={(e) => handleChange("location", e.target.value)}
+        >
+          <option value="">Select a location…</option>
+          {locations.map((loc) => (
+            <option key={loc} value={loc}>
+              {loc}
+            </option>
+          ))}
+        </select>
+        {errors.location && <span className="error">{errors.location}</span>}
       </div>
 
-      <div className="form-field">
+      <div className="field">
         <label htmlFor="carpet_area_sqft">Carpet area (sqft)</label>
         <input
           id="carpet_area_sqft"
           type="number"
-          min={1}
-          value={form.carpet_area_sqft || ""}
-          onChange={(e) => update("carpet_area_sqft", Number(e.target.value))}
+          min="1"
+          value={form.carpet_area_sqft}
+          onChange={(e) => handleChange("carpet_area_sqft", e.target.value)}
         />
-        {fieldErrors.carpet_area_sqft && <p className="error">{fieldErrors.carpet_area_sqft}</p>}
+        {errors.carpet_area_sqft && <span className="error">{errors.carpet_area_sqft}</span>}
       </div>
 
-      <div className="form-field">
-        <label htmlFor="floor_num">Floor number (0 = Ground, -1 = Basement)</label>
+      <div className="field">
+        <label htmlFor="floor_num">Floor number</label>
         <input
           id="floor_num"
           type="number"
           value={form.floor_num}
-          onChange={(e) => update("floor_num", Number(e.target.value))}
+          onChange={(e) => handleChange("floor_num", e.target.value)}
         />
+        {errors.floor_num && <span className="error">{errors.floor_num}</span>}
       </div>
 
-      <div className="form-field">
+      <div className="field">
         <label htmlFor="bathroom">Bathrooms</label>
         <input
           id="bathroom"
           type="number"
-          min={0}
+          min="0"
           value={form.bathroom}
-          onChange={(e) => update("bathroom", Number(e.target.value))}
+          onChange={(e) => handleChange("bathroom", e.target.value)}
         />
-        {fieldErrors.bathroom && <p className="error">{fieldErrors.bathroom}</p>}
+        {errors.bathroom && <span className="error">{errors.bathroom}</span>}
       </div>
 
-      <div className="form-field">
+      <div className="field">
         <label htmlFor="balcony">Balconies</label>
         <input
           id="balcony"
           type="number"
-          min={0}
+          min="0"
           value={form.balcony}
-          onChange={(e) => update("balcony", Number(e.target.value))}
+          onChange={(e) => handleChange("balcony", e.target.value)}
         />
-        {fieldErrors.balcony && <p className="error">{fieldErrors.balcony}</p>}
+        {errors.balcony && <span className="error">{errors.balcony}</span>}
       </div>
 
-      <div className="form-field">
+      <div className="field">
         <label htmlFor="furnishing">Furnishing</label>
         <select
           id="furnishing"
           value={form.furnishing}
-          onChange={(e) => update("furnishing", e.target.value)}
+          onChange={(e) => handleChange("furnishing", e.target.value)}
         >
           {FURNISHING_OPTIONS.map((opt) => (
             <option key={opt} value={opt}>
@@ -152,12 +179,12 @@ export default function PredictionForm() {
         </select>
       </div>
 
-      <div className="form-field">
-        <label htmlFor="transaction">Transaction type</label>
+      <div className="field">
+        <label htmlFor="transaction">Transaction</label>
         <select
           id="transaction"
           value={form.transaction}
-          onChange={(e) => update("transaction", e.target.value)}
+          onChange={(e) => handleChange("transaction", e.target.value)}
         >
           {TRANSACTION_OPTIONS.map((opt) => (
             <option key={opt} value={opt}>
@@ -167,12 +194,12 @@ export default function PredictionForm() {
         </select>
       </div>
 
-      <div className="form-field">
+      <div className="field">
         <label htmlFor="ownership">Ownership</label>
         <select
           id="ownership"
           value={form.ownership}
-          onChange={(e) => update("ownership", e.target.value)}
+          onChange={(e) => handleChange("ownership", e.target.value)}
         >
           {OWNERSHIP_OPTIONS.map((opt) => (
             <option key={opt} value={opt}>
@@ -182,9 +209,9 @@ export default function PredictionForm() {
         </select>
       </div>
 
-      <div className="form-field">
+      <div className="field">
         <label htmlFor="facing">Facing</label>
-        <select id="facing" value={form.facing} onChange={(e) => update("facing", e.target.value)}>
+        <select id="facing" value={form.facing} onChange={(e) => handleChange("facing", e.target.value)}>
           {FACING_OPTIONS.map((opt) => (
             <option key={opt} value={opt}>
               {opt}
@@ -196,7 +223,7 @@ export default function PredictionForm() {
       {submitError && <p className="error submit-error">{submitError}</p>}
 
       <button type="submit" disabled={loading}>
-        {loading ? "Predicting…" : "Predict Price"}
+        {loading ? "Predicting…" : "Predict price"}
       </button>
     </form>
   );
